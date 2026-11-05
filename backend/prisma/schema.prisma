@@ -1,0 +1,540 @@
+// Prisma Configuration for Explore Dhandusar
+// Phase 2: Database Modeling & Data Access Layer
+// Bilingual (Gujarati + English) digital village platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum LanguageCode {
+  GU // Gujarati
+  EN // English
+}
+
+enum ContentStatus {
+  DRAFT
+  PENDING_REVIEW
+  CHANGES_REQUESTED
+  PUBLISHED
+  ARCHIVED
+  REJECTED
+}
+
+enum PlaceType {
+  TEMPLE
+  HISTORICAL_SITE
+  LANDMARK
+  PUBLIC_FACILITY
+}
+
+enum VillageInfoCategory {
+  AGRICULTURE
+  FARMING
+  DAIRY
+  ANIMAL_HUSBANDRY
+  CULTURE
+  TRADITION
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+// ==========================================
+// ADMIN & RBAC (Role-Based Access Control)
+// ==========================================
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relationships
+  roles         UserRole[]
+  newsArticles  NewsArticle[]
+  uploadedMedia MediaItem[]
+  reviews       ContentReview[]
+  activityLogs  ActivityLog[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  userAgent String?
+  ipAddress String?
+
+  // Relationships
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique // e.g. SUPER_ADMIN, ADMIN, EDITOR, PUBLISHER
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relationships
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique // e.g. "news:create", "news:publish", "places:edit"
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relationships
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  // Relationships
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  assignedAt   DateTime   @default(now())
+
+  // Relationships
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ==========================================
+// NEWS & ANNOUNCEMENTS
+// ==========================================
+
+model NewsCategory {
+  id        String        @id @default(uuid())
+  slug      String        @unique
+  nameGu    String
+  nameEn    String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relationships
+  articles  NewsArticle[]
+
+  @@map("news_categories")
+}
+
+model NewsArticle {
+  id            String            @id @default(uuid())
+  categoryId    String
+  authorId      String
+  status        ContentStatus     @default(DRAFT)
+  isPinned      Boolean           @default(false)
+  featuredImage String?
+  sourceUrl     String?
+  sourceName    String?
+  publishedAt   DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relationships
+  category      NewsCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author        User              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  translations  NewsTranslation[]
+
+  @@index([status, publishedAt])
+  @@index([isPinned])
+  @@index([categoryId])
+  @@map("news_articles")
+}
+
+model NewsTranslation {
+  id             String       @id @default(uuid())
+  newsArticleId  String
+  languageCode   LanguageCode
+  title          String
+  slug           String
+  summary        String?      @db.Text
+  content        String       @db.Text
+  seoTitle       String?
+  seoDescription String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relationships
+  newsArticle    NewsArticle  @relation(fields: [newsArticleId], references: [id], onDelete: Cascade)
+
+  @@unique([newsArticleId, languageCode])
+  @@unique([languageCode, slug])
+  @@index([slug])
+  @@map("news_translations")
+}
+
+// ==========================================
+// VILLAGE PLACES (Temples, Landmarks, etc.)
+// ==========================================
+
+model VillagePlace {
+  id            String                    @id @default(uuid())
+  type          PlaceType
+  status        ContentStatus             @default(DRAFT)
+  latitude      Float?
+  longitude     Float?
+  featuredImage String?
+  address       String?
+  contactPhone  String?
+  isFeatured    Boolean                   @default(false)
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  // Relationships
+  translations  VillagePlaceTranslation[]
+
+  @@index([type, status])
+  @@index([isFeatured])
+  @@map("village_places")
+}
+
+model VillagePlaceTranslation {
+  id             String       @id @default(uuid())
+  villagePlaceId String
+  languageCode   LanguageCode
+  name           String
+  slug           String
+  summary        String?      @db.Text
+  description    String       @db.Text
+  history        String?      @db.Text
+  timing         String?
+  architecture   String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relationships
+  villagePlace   VillagePlace @relation(fields: [villagePlaceId], references: [id], onDelete: Cascade)
+
+  @@unique([villagePlaceId, languageCode])
+  @@unique([languageCode, slug])
+  @@index([slug])
+  @@map("village_place_translations")
+}
+
+// ==========================================
+// VILLAGE INFORMATION (Agriculture, Dairy, Culture)
+// ==========================================
+
+model VillageInfo {
+  id            String                   @id @default(uuid())
+  category      VillageInfoCategory
+  status        ContentStatus            @default(DRAFT)
+  featuredImage String?
+  isFeatured    Boolean                  @default(false)
+  sortOrder     Int                      @default(0)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  // Relationships
+  translations  VillageInfoTranslation[]
+
+  @@index([category, status])
+  @@index([sortOrder])
+  @@map("village_info")
+}
+
+model VillageInfoTranslation {
+  id             String       @id @default(uuid())
+  villageInfoId  String
+  languageCode   LanguageCode
+  title          String
+  slug           String
+  summary        String?      @db.Text
+  content        String       @db.Text
+  seoTitle       String?
+  seoDescription String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relationships
+  villageInfo    VillageInfo  @relation(fields: [villageInfoId], references: [id], onDelete: Cascade)
+
+  @@unique([villageInfoId, languageCode])
+  @@unique([languageCode, slug])
+  @@index([slug])
+  @@map("village_info_translations")
+}
+
+// ==========================================
+// LOCAL BUSINESSES & SERVICES
+// ==========================================
+
+model BusinessCategory {
+  id          String        @id @default(uuid())
+  slug        String        @unique
+  nameGu      String
+  nameEn      String
+  icon        String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relationships
+  businesses  Business[]
+
+  @@map("business_categories")
+}
+
+model Business {
+  id            String                @id @default(uuid())
+  categoryId    String
+  status        ContentStatus         @default(DRAFT)
+  phone         String?
+  email         String?
+  website       String?
+  address       String?
+  latitude      Float?
+  longitude     Float?
+  openingHours  String?
+  featuredImage String?
+  isVerified    Boolean               @default(false)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  // Relationships
+  category      BusinessCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  translations  BusinessTranslation[]
+
+  @@index([categoryId, status])
+  @@index([isVerified])
+  @@map("businesses")
+}
+
+model BusinessTranslation {
+  id               String       @id @default(uuid())
+  businessId       String
+  languageCode     LanguageCode
+  name             String
+  slug             String
+  description      String?      @db.Text
+  ownerName        String?
+  productsServices String?      @db.Text
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // Relationships
+  business         Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, languageCode])
+  @@unique([languageCode, slug])
+  @@index([slug])
+  @@map("business_translations")
+}
+
+// ==========================================
+// EVENTS & FESTIVALS
+// ==========================================
+
+model Event {
+  id            String             @id @default(uuid())
+  status        ContentStatus      @default(DRAFT)
+  startDate     DateTime
+  endDate       DateTime?
+  featuredImage String?
+  location      String?
+  isFeatured    Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  // Relationships
+  translations  EventTranslation[]
+
+  @@index([startDate, status])
+  @@index([isFeatured])
+  @@map("events")
+}
+
+model EventTranslation {
+  id           String       @id @default(uuid())
+  eventId      String
+  languageCode LanguageCode
+  title        String
+  slug         String
+  description  String       @db.Text
+  organizer    String?
+  venueDetails String?      @db.Text
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relationships
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, languageCode])
+  @@unique([languageCode, slug])
+  @@index([slug])
+  @@map("event_translations")
+}
+
+// ==========================================
+// GALLERY & CLOUDINARY MEDIA
+// ==========================================
+
+model MediaAlbum {
+  id           String                  @id @default(uuid())
+  status       ContentStatus           @default(DRAFT)
+  coverImage   String?
+  isFeatured   Boolean                 @default(false)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  // Relationships
+  translations MediaAlbumTranslation[]
+  mediaItems   MediaItem[]
+
+  @@index([status])
+  @@index([isFeatured])
+  @@map("media_albums")
+}
+
+model MediaAlbumTranslation {
+  id           String       @id @default(uuid())
+  albumId      String
+  languageCode LanguageCode
+  title        String
+  slug         String
+  description  String?      @db.Text
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relationships
+  album        MediaAlbum   @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, languageCode])
+  @@unique([languageCode, slug])
+  @@index([slug])
+  @@map("media_album_translations")
+}
+
+model MediaItem {
+  id           String                 @id @default(uuid())
+  albumId      String?
+  uploadedById String?
+  publicId     String                 @unique // Cloudinary public identifier
+  secureUrl    String                 // Cloudinary delivery URL
+  resourceType MediaType              @default(IMAGE)
+  format       String
+  width        Int?
+  height       Int?
+  bytes        Int?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  // Relationships
+  album        MediaAlbum?            @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  uploadedBy   User?                  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  translations MediaItemTranslation[]
+
+  @@index([albumId])
+  @@index([resourceType])
+  @@index([uploadedById])
+  @@map("media_items")
+}
+
+model MediaItemTranslation {
+  id           String       @id @default(uuid())
+  mediaItemId  String
+  languageCode LanguageCode
+  title        String?
+  caption      String?      @db.Text
+  altText      String?
+  credits      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relationships
+  mediaItem    MediaItem    @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaItemId, languageCode])
+  @@map("media_item_translations")
+}
+
+// ==========================================
+// PUBLISHING APPROVAL & ACTIVITY AUDITING
+// ==========================================
+
+model ContentReview {
+  id         String        @id @default(uuid())
+  entityType String        // e.g. "NewsArticle", "VillagePlace", "Business", "Event"
+  entityId   String
+  reviewerId String
+  fromStatus ContentStatus
+  toStatus   ContentStatus
+  feedback   String?       @db.Text
+  createdAt  DateTime      @default(now())
+
+  // Relationships
+  reviewer   User          @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([reviewerId])
+  @@map("content_reviews")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String   // e.g. "USER_LOGIN", "CONTENT_STATUS_CHANGED", "MEDIA_UPLOADED"
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  // Relationships
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
