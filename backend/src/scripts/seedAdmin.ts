@@ -9,7 +9,6 @@ interface RoleDefinition {
   permissions: string[];
 }
 
-// 1. Approved Roles and their permission matrix
 const PERMISSIONS = [
   { code: 'dashboard.view', description: 'View private administrative dashboard' },
   { code: 'news.create', description: 'Draft news articles and announcements' },
@@ -74,17 +73,18 @@ const ROLES: RoleDefinition[] = [
 export async function seedRolesAndPermissions(): Promise<void> {
   console.log('🌱 Seeding RBAC permissions and approved roles...');
 
-  // 1. Upsert Permissions
-  for (const perm of PERMISSIONS) {
-    await prisma.permission.upsert({
-      where: { code: perm.code },
-      create: { code: perm.code, description: perm.description },
-      update: { description: perm.description },
-    });
-  }
+  // 1. Bulk insert permissions in a single batch
+  await prisma.permission.createMany({
+    data: PERMISSIONS,
+    skipDuplicates: true,
+  });
   console.log(`✅ Upserted ${PERMISSIONS.length} system permissions.`);
 
-  // 2. Upsert Roles and link Permissions
+  // 2. Fetch all permissions map in one query
+  const allPermissions = await prisma.permission.findMany();
+  const permMap = new Map(allPermissions.map((p) => [p.code, p.id]));
+
+  // 3. Upsert each role and batch insert its role-permissions
   for (const roleDef of ROLES) {
     const role = await prisma.role.upsert({
       where: { name: roleDef.name },
@@ -92,25 +92,19 @@ export async function seedRolesAndPermissions(): Promise<void> {
       update: { description: roleDef.description },
     });
 
-    for (const permCode of roleDef.permissions) {
-      const permission = await prisma.permission.findUnique({
-        where: { code: permCode },
+    const rolePerms = roleDef.permissions
+      .map((code) => permMap.get(code))
+      .filter((permId): permId is string => Boolean(permId))
+      .map((permissionId) => ({
+        roleId: role.id,
+        permissionId,
+      }));
+
+    if (rolePerms.length > 0) {
+      await prisma.rolePermission.createMany({
+        data: rolePerms,
+        skipDuplicates: true,
       });
-      if (permission) {
-        await prisma.rolePermission.upsert({
-          where: {
-            roleId_permissionId: {
-              roleId: role.id,
-              permissionId: permission.id,
-            },
-          },
-          create: {
-            roleId: role.id,
-            permissionId: permission.id,
-          },
-          update: {},
-        });
-      }
     }
   }
   console.log(`✅ Upserted ${ROLES.length} approved roles with permission bindings.`);
@@ -212,6 +206,7 @@ async function main() {
     await seedRolesAndPermissions();
     await provisionSuperAdmin();
     await prisma.$disconnect();
+    process.exit(0);
   } catch (error) {
     console.error('❌ Failed to provision Super Admin:', error);
     await prisma.$disconnect();
@@ -222,4 +217,3 @@ async function main() {
 if (process.argv[1]?.endsWith('seedAdmin.ts') || process.argv[1]?.endsWith('seedAdmin.js')) {
   main();
 }
-
