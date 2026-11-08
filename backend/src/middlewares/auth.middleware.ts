@@ -115,3 +115,30 @@ export function authorizePermission(...requiredPermissions: string[]) {
   };
 }
 
+/**
+ * Permission-Based Access Control middleware (OR condition).
+ * Allows access if the user possesses AT LEAST ONE of the listed permissions, or is a SUPER_ADMIN.
+ */
+export function authorizeAnyPermission(...permissions: string[]) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      return next(new AppError('Authentication required.', 401, 'UNAUTHORIZED'));
+    }
+
+    const isSuperAdmin = req.user.roles.includes('SUPER_ADMIN');
+    const hasAny = permissions.some((perm) => req.user!.permissions.includes(perm));
+
+    if (!isSuperAdmin && !hasAny) {
+      return next(
+        new AppError(
+          `Forbidden. Requires at least one of: ${permissions.join(', ')}`,
+          403,
+          'FORBIDDEN_PERMISSION'
+        )
+      );
+    }
+
+    next();
+  };
+}
+

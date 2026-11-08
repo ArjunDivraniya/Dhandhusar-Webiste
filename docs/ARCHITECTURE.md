@@ -128,6 +128,6 @@ To guarantee zero connection exhaustion when running behind serverless or pooled
 - [x] **Phase 1**: Project Foundation (Monorepo orchestration, Vite+React+Tailwind frontend, Express+TypeScript backend, health API)
 - [x] **Phase 2**: Database Modeling & Data Access Layer (Prisma schema with 24 models, PostgreSQL configuration, bilingual translation models, repository pattern)
 - [x] **Phase 3**: Authentication & RBAC (Admin login, JWT + HttpOnly refresh token rotation, bcrypt password security, Role and Permission middleware, Super Admin CLI provisioning)
-- [ ] **Phase 4**: Publishing Workflow & Core Services (Editor submission, Publisher review/approval, News/Village/Business services)
-- [ ] **Phase 5**: Frontend Bilingual Integration & UI Modules (Hero, Village Directory, News Feed, Interactive Map)
+- [x] **Phase 4**: Publishing Workflow & Core Content Services (News CRUD, publishing state machine, Editor -> Publisher approval workflow, bilingual translations, ContentReview audit history, public isolation)
+- [ ] **Phase 5**: Public Frontend Experience & Bilingual Village UI (Hero, Village Directory, News Feed, Interactive Map, Temples & Agriculture pages)
 - [ ] **Phase 6**: Production Hardening & Cloud Deployment

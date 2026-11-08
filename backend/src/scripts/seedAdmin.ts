@@ -201,10 +201,31 @@ export async function provisionSuperAdmin(): Promise<void> {
   console.log('========================================================');
 }
 
+const DEFAULT_CATEGORIES = [
+  { slug: 'gram-panchayat', nameGu: 'ગ્રામ પંચાયત', nameEn: 'Gram Panchayat' },
+  { slug: 'agriculture-farming', nameGu: 'ખેતી અને સિંચાઈ', nameEn: 'Agriculture & Irrigation' },
+  { slug: 'village-announcements', nameGu: 'ગામ જાહેરાતો', nameEn: 'Village Announcements' },
+  { slug: 'cultural-festivals', nameGu: 'ઉત્સવો અને તહેવારો', nameEn: 'Cultural Festivals' },
+  { slug: 'development-projects', nameGu: 'વિકાસ કાર્યો', nameEn: 'Development Projects' },
+];
+
+export async function seedNewsCategories(): Promise<void> {
+  console.log('🌱 Seeding initial village news categories...');
+  for (const cat of DEFAULT_CATEGORIES) {
+    await prisma.newsCategory.upsert({
+      where: { slug: cat.slug },
+      create: cat,
+      update: { nameGu: cat.nameGu, nameEn: cat.nameEn },
+    });
+  }
+  console.log(`✅ Upserted ${DEFAULT_CATEGORIES.length} default news categories.`);
+}
+
 async function main() {
   try {
     await seedRolesAndPermissions();
     await provisionSuperAdmin();
+    await seedNewsCategories();
     await prisma.$disconnect();
     process.exit(0);
   } catch (error) {
