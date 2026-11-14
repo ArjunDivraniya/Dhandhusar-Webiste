@@ -70,3 +70,4 @@ export const newsApi = {
     return res.data!;
   },
 };
+

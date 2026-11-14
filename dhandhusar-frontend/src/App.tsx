@@ -1,122 +1,105 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext.tsx';
+import { LanguageProvider } from './context/LanguageContext.tsx';
+import { ProtectedRoute } from './components/routing/ProtectedRoute.tsx';
 
-function App() {
-  const [count, setCount] = useState(0)
+// Layouts
+import { AdminLayout } from './components/layout/AdminLayout.tsx';
+import { PublicLayout } from './components/public/PublicLayout.tsx';
 
+// Public Pages
+import { HomePage } from './pages/public/HomePage.tsx';
+import { PublicNewsListPage } from './pages/public/PublicNewsListPage.tsx';
+import { PublicNewsDetailPage } from './pages/public/PublicNewsDetailPage.tsx';
+import { NotFoundPage } from './pages/public/NotFoundPage.tsx';
+
+// Admin Pages
+import { LoginPage } from './pages/auth/LoginPage.tsx';
+import { OverviewPage } from './pages/dashboard/OverviewPage.tsx';
+import { NewsListPage } from './pages/news/NewsListPage.tsx';
+import { NewsEditorPage } from './pages/news/NewsEditorPage.tsx';
+import { NewsDetailPage } from './pages/news/NewsDetailPage.tsx';
+import { ReviewQueuePage } from './pages/review/ReviewQueuePage.tsx';
+import { CategoriesPage } from './pages/categories/CategoriesPage.tsx';
+
+import { Toaster } from 'sonner';
+
+export const App: React.FC = () => {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount(count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>  
+    <BrowserRouter>
+      <LanguageProvider>
+        <AuthProvider>
+          <Toaster position="top-right" richColors closeButton />
+          <Routes>
+            {/* ========================================================
+                Public Website Routes
+                ======================================================== */}
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/news" element={<PublicNewsListPage />} />
+              <Route path="/news/:slug" element={<PublicNewsDetailPage />} />
+              {/* Fallback 404 for Public Routes */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
 
-      <div className="ticks"></div>
+            {/* ========================================================
+                Admin Authentication
+                ======================================================== */}
+            <Route path="/login" element={<LoginPage />} />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            {/* ========================================================
+                Protected Admin Portal Routes
+                ======================================================== */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              {/* Dashboard Overview */}
+              <Route index element={<OverviewPage />} />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
+              {/* News Articles Management */}
+              <Route path="news" element={<NewsListPage />} />
+              <Route
+                path="news/new"
+                element={
+                  <ProtectedRoute requiredPermission="news.create">
+                    <NewsEditorPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="news/edit/:id"
+                element={
+                  <ProtectedRoute requiredPermission="news.edit">
+                    <NewsEditorPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="news/:id" element={<NewsDetailPage />} />
 
-export default App
+              {/* Publisher Review Queue */}
+              <Route
+                path="review"
+                element={
+                  <ProtectedRoute requiredPermission="news.review">
+                    <ReviewQueuePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Categories */}
+              <Route path="categories" element={<CategoriesPage />} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </LanguageProvider>
+    </BrowserRouter>
+  );
+};
+
+export default App;

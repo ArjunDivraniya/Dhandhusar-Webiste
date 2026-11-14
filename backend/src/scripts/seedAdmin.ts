@@ -114,20 +114,6 @@ export async function provisionSuperAdmin(): Promise<void> {
   const email = (env.SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || 'admin@dhandusar.gujarat.gov.in').toLowerCase().trim();
   const name = env.SUPER_ADMIN_NAME || process.env.SUPER_ADMIN_NAME || 'Chief Administrator';
 
-  // Check if admin already exists
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-    include: { roles: { include: { role: true } } },
-  });
-
-  if (existingUser) {
-    const isSuperAdmin = existingUser.roles.some((r) => r.role.name === 'SUPER_ADMIN');
-    if (isSuperAdmin) {
-      console.log(`ℹ️ Super Admin account with email '${email}' already exists. No action needed.`);
-      return;
-    }
-  }
-
   // Determine password
   let password = env.SUPER_ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD;
   let generatedPassword = false;
@@ -139,7 +125,7 @@ export async function provisionSuperAdmin(): Promise<void> {
 
   const passwordHash = await hashPassword(password);
 
-  // Create or update user
+  // Create or update user password
   const user = await prisma.user.upsert({
     where: { email },
     create: {
@@ -149,6 +135,7 @@ export async function provisionSuperAdmin(): Promise<void> {
       isActive: true,
     },
     update: {
+      name,
       passwordHash,
       isActive: true,
     },

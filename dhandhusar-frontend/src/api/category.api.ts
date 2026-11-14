@@ -12,3 +12,4 @@ export const categoryApi = {
     return res.data!;
   },
 };
+

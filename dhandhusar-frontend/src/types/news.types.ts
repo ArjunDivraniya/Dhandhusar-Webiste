@@ -87,6 +87,15 @@ export interface AdminNewsFilters {
   limit?: number;
 }
 
+export interface PublicNewsQuery {
+  lang?: LanguageCode;
+  category?: string;
+  search?: string;
+  sort?: 'newest' | 'oldest';
+  page?: number;
+  limit?: number;
+}
+
 export interface CreateNewsInput {
   categoryId: string;
   isPinned?: boolean;
@@ -131,3 +140,4 @@ export interface UpdateNewsInput {
     seoDescription?: string | null;
   }>;
 }
+

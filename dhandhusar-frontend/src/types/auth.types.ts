@@ -17,3 +17,4 @@ export interface AuthResponseData {
   accessToken: string;
   user: User;
 }
+
